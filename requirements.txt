@@ -1,3 +1,6 @@
-Flask
-instagrapi
+flask
 yt-dlp
+instagrapi
+browser-cookie3
+requests
+pytube
