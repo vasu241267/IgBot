@@ -44,13 +44,22 @@ def convert_cookies():
 
 def login_instagram():
     cl = Client()
-    try:
+    if os.path.exists("session.json"):
         cl.load_settings("session.json")
-        cl.login(USERNAME, PASSWORD)
-    except LoginRequired:
-        cl.login(USERNAME, PASSWORD)
-        cl.dump_settings("session.json")
+        try:
+            cl.get_timeline_feed()  # try if session still valid
+            print("✅ Session loaded from session.json")
+            return cl
+        except Exception as e:
+            print("⚠️ Failed to use saved session, logging in fresh:", e)
+
+    username = os.environ.get("IG_USERNAME") or "cricko.fun"
+    password = os.environ.get("IG_PASSWORD") or "@Vasu2412"
+    cl.login(username, password)
+    cl.dump_settings("session.json")
+    print("✅ Logged in and session saved to session.json")
     return cl
+
 
 def get_uploaded_titles():
     if not os.path.exists("uploaded_titles.txt"):
