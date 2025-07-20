@@ -1,127 +1,120 @@
-# main.py (Complete YouTube to Instagram Reels uploader with auto cookie conversion)
+from flask import Flask
 import os
-import yt_dlp
-import logging
+import time
 import json
-from flask import Flask, request
+import logging
 from instagrapi import Client
+from yt_dlp import YoutubeDL
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-# ========== Config ==========
-output_folder = "downloads"
-os.makedirs(output_folder, exist_ok=True)
-video_path = os.path.join(output_folder, "reel.mp4")
-cookies_file = "cookies.txt"
-cookie_json_file = "cookie.json"
-session_file = "insta_session.json"
-caption = "Follow For Such Amazing Content 😋 #Viral #Like #Follow #Meme... This Reel Is Uploaded Via Automation"
+# CONFIG
+username = os.getenv("INSTA_USER", "your_username")
+password = os.getenv("INSTA_PASS", "your_password")
+playlist_url = os.getenv("YOUTUBE_PLAYLIST", "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID")
+download_dir = "downloads"
+cookie_json = "cookie.json"
+cookie_txt = "cookies.txt"
+log_file = "upload.log"
+wait_seconds = 5 * 3600
+caption = "Follow @yourpage for more 🔥\n.\n.\n.\n#reels #viral #trending"
 
-username = os.getenv("INSTA_USERNAME", "cricko.fun")
-password = os.getenv("INSTA_PASSWORD", "@Vasu2412")
+os.makedirs(download_dir, exist_ok=True)
+logging.basicConfig(filename=log_file, level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-cl = Client()
-
-if os.path.exists(session_file):
-    cl.load_settings(session_file)
+# Convert JSON cookie to TXT
+def convert_cookie():
     try:
-        cl.login(username, password)
-        logging.info("✅ Session restored.")
-    except:
-        cl.login(username, password)
-        cl.dump_settings(session_file)
-else:
-    cl.login(username, password)
-    cl.dump_settings(session_file)
-
-# ========== Convert JSON cookies to cookies.txt ==========
-def convert_json_to_cookies_txt(json_file, txt_file):
-    try:
-        with open(json_file, 'r', encoding='utf-8') as f:
+        with open(cookie_json) as f:
             cookies = json.load(f)
-
-        with open(txt_file, 'w', encoding='utf-8') as f:
+        with open(cookie_txt, "w") as f:
             for c in cookies:
-                f.write(f"{c['domain']}	"
-                        f"{str(not c.get('hostOnly', False)).upper()}	"
-                        f"{c['path']}	"
-                        f"{'TRUE' if c['secure'] else 'FALSE'}	"
-                        f"{int(c['expirationDate']) if 'expirationDate' in c else 0}	"
-                        f"{c['name']}	"
-                        f"{c['value']}\n")
+                f.write(f"{c['domain']}\tTRUE\t{c['path']}\t{str(c['secure']).upper()}\t0\t{c['name']}\t{c['value']}\n")
         logging.info("✅ cookies.txt generated from cookie.json")
     except Exception as e:
         logging.error(f"❌ Failed to convert cookie: {e}")
 
-# Always run conversion at startup
-if os.path.exists(cookie_json_file):
-    convert_json_to_cookies_txt(cookie_json_file, cookies_file)
-else:
-    logging.warning("⚠️ cookie.json not found — using last cookies.txt")
+convert_cookie()
 
-# ========== Helpers ==========
-def download_video(url):
-    if os.path.exists(video_path):
-        os.remove(video_path)
-    if os.path.exists("reel.mp4.jpg"):
-        os.remove("reel.mp4.jpg")
+# Setup Instagram client
+cl = Client()
+cl.login(username, password)
+logging.info("✅ Logged into Instagram")
 
+# Store uploaded titles
+uploaded_file = "uploaded.txt"
+if not os.path.exists(uploaded_file):
+    open(uploaded_file, 'w').close()
+
+def get_uploaded_titles():
+    with open(uploaded_file) as f:
+        return set(line.strip() for line in f)
+
+def mark_as_uploaded(title):
+    with open(uploaded_file, "a") as f:
+        f.write(title + "\n")
+
+def download_video(video_url):
     ydl_opts = {
-        'outtmpl': video_path,
-        'quiet': False,
-        'format': 'mp4/best',
-        'noplaylist': True,
-        'geo_bypass': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'headers': {
-            'Accept-Language': 'en-US,en;q=0.9',
-        },
-        'retries': 3,
+        'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
+        'format': 'mp4[height<=720]',
+        'quiet': True,
     }
-
-    if os.path.exists(cookies_file):
-        ydl_opts['cookiefile'] = cookies_file
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        logging.info(f"✅ Downloaded: {info.get('title')}")
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url)
         return info
 
-# ========== Routes ==========
+def background_job():
+    extract_opts = {'extract_flat': True, 'quiet': True, 'skip_download': True}
+
+    while True:
+        uploaded_titles = get_uploaded_titles()
+
+        with YoutubeDL(extract_opts) as ydl:
+            playlist = ydl.extract_info(playlist_url, download=False)
+            videos = playlist.get('entries', [])
+
+        for entry in videos:
+            title = entry.get('title')
+            video_id = entry.get('id')
+
+            if not title or not video_id or title in uploaded_titles:
+                continue
+
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+            try:
+                logging.info(f"📥 Downloading: {title}")
+                info = download_video(video_url)
+
+                video_path = os.path.join(download_dir, f"{info['title']}.{info['ext']}")
+
+                try:
+                    last_reel = cl.user_clips(cl.user_id)[0]
+                    cl.clip_delete(last_reel.pk)
+                    logging.info("🗑️ Previous reel deleted successfully.")
+                except Exception as e:
+                    logging.warning(f"⚠️ Couldn't delete previous reel: {e}")
+
+                logging.info("🚀 Uploading to Instagram...")
+                cl.clip_upload(video_path, caption=caption)
+                logging.info(f"✅ Uploaded: {title}")
+
+                mark_as_uploaded(title)
+                break
+
+            except Exception as e:
+                logging.error(f"❌ Error uploading {title}: {e}")
+
+        logging.info(f"⏳ Sleeping {wait_seconds // 3600}h...")
+        time.sleep(wait_seconds)
+
+import threading
+threading.Thread(target=background_job, daemon=True).start()
+
 @app.route("/")
 def home():
-    return "🤖 YouTube to Instagram API is Running!"
+    return "INSTAGRAM REEL AUTO-UPLOADER RUNNING"
 
-@app.route("/set-cookies", methods=["POST"])
-def set_cookies():
-    content = request.data.decode("utf-8")
-    with open(cookie_json_file, "w", encoding="utf-8") as f:
-        f.write(content)
-    convert_json_to_cookies_txt(cookie_json_file, cookies_file)
-    return {"status": "✅ cookie.json saved and converted"}
-
-@app.route("/upload", methods=["POST"])
-def upload():
-    data = request.json
-    url = data.get("url")
-
-    if not url:
-        return {"error": "Missing 'url'"}, 400
-
-    try:
-        info = download_video(url)
-        logging.info(f"📤 Uploading {video_path} to Instagram")
-        cl.clip_upload(video_path, caption=caption)
-        logging.info(f"✅ Uploaded to Instagram: {info.get('title')}")
-        return {"status": "✅ Uploaded", "title": info.get("title")}
-    except Exception as e:
-        logging.error(f"❌ Error uploading: {e}")
-        return {"error": str(e)}, 500
-
-@app.route("/health")
-def health():
-    return {"status": "ok"}
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
