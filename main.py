@@ -1,29 +1,23 @@
-# app.py
-import yt_dlp
-import time
+# main.py (Full API version)
 import os
+import yt_dlp
 import logging
+from flask import Flask, request
 from instagrapi import Client
-from flask import Flask
-import threading
 
-# ========== Configuration ==========
-playlist_url = "https://youtube.com/playlist?list=PLzlOHuvgTpSY4_88tPkqV9BKMt-J2Ivnm&si=zXefeH20MrI7dN6f"
-wait_seconds = 5 * 60 * 60
-output_folder = "downloads"
-video_path = os.path.join(output_folder, "reel.mp4")
-uploaded_file = "uploaded_titles.txt"
-session_file = "insta_session.json"
-caption = "Follow For Such Amazing Content 😋 #Viral #Like #Follow #Meme... This Reel Is Uploaded Via Automation If You Wanna Learn Then Dm Me Asap"
-
-# ========== Setup ==========
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+
+# ========== Config ==========
+output_folder = "downloads"
 os.makedirs(output_folder, exist_ok=True)
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
+video_path = os.path.join(output_folder, "reel.mp4")
+cookies_file = "cookies.txt"
+session_file = "insta_session.json"
+caption = "Follow For Such Amazing Content 😋 #Viral #Like #Follow #Meme... This Reel Is Uploaded Via Automation"
 
-username = "cricko.fun"
-password = "@Vasu2412"
-
+username = os.getenv("INSTA_USERNAME", "cricko.fun")
+password = os.getenv("INSTA_PASSWORD", "@Vasu2412")
 
 cl = Client()
 
@@ -39,16 +33,7 @@ else:
     cl.login(username, password)
     cl.dump_settings(session_file)
 
-def get_uploaded_titles():
-    if not os.path.exists(uploaded_file):
-        return set()
-    with open(uploaded_file, "r", encoding='utf-8') as f:
-        return set(line.strip() for line in f)
-
-def mark_as_uploaded(title):
-    with open(uploaded_file, "a", encoding='utf-8') as f:
-        f.write(title + "\n")
-
+# ========== Helpers ==========
 def download_video(url):
     if os.path.exists(video_path):
         os.remove(video_path)
@@ -60,51 +45,51 @@ def download_video(url):
         'quiet': True,
         'format': 'mp4/best',
         'noplaylist': True,
+        'geo_bypass': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'headers': {
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        'retries': 3,
     }
+
+    if os.path.exists(cookies_file):
+        ydl_opts['cookiefile'] = cookies_file
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=True)
 
-def background_job():
-    extract_opts = {'extract_flat': True, 'quiet': True, 'skip_download': True}
-
-    while True:
-        uploaded_titles = get_uploaded_titles()
-
-        with yt_dlp.YoutubeDL(extract_opts) as ydl:
-            playlist = ydl.extract_info(playlist_url, download=False)
-            videos = playlist.get('entries', [])
-
-        for entry in videos:
-            title = entry.get('title')
-            video_id = entry.get('id')
-
-            if not title or not video_id or title in uploaded_titles:
-                continue
-
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-
-            try:
-                logging.info(f"📥 Downloading: {title}")
-                info = download_video(video_url)
-
-                logging.info("🚀 Uploading to Instagram...")
-                cl.clip_upload(video_path, caption=caption)
-                logging.info(f"✅ Uploaded: {title}")
-
-                mark_as_uploaded(title)
-                break  # only upload 1 at a time, then wait
-
-            except Exception as e:
-                logging.error(f"❌ Error uploading {title}: {e}")
-
-        logging.info(f"⏳ Sleeping {wait_seconds // 3600}h...")
-        time.sleep(wait_seconds)
-
+# ========== Routes ==========
 @app.route("/")
 def home():
-    return "🤖 Instagram Auto Upload Bot Running!"
+    return "🤖 YouTube to Instagram API is Running!"
+
+@app.route("/set-cookies", methods=["POST"])
+def set_cookies():
+    content = request.data.decode("utf-8")
+    with open(cookies_file, "w", encoding="utf-8") as f:
+        f.write(content)
+    return {"status": "✅ Cookies saved"}
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    data = request.json
+    url = data.get("url")
+
+    if not url:
+        return {"error": "Missing 'url'"}, 400
+
+    try:
+        info = download_video(url)
+        cl.clip_upload(video_path, caption=caption)
+        return {"status": "✅ Uploaded", "title": info.get("title")}
+    except Exception as e:
+        logging.error(f"❌ Error: {e}")
+        return {"error": str(e)}, 500
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
-    threading.Thread(target=background_job, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
