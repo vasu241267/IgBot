@@ -11,9 +11,9 @@ from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
 
-USERNAME = "your_instagram_username"
-PASSWORD = "your_instagram_password"
-YOUTUBE_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PL..."  # Replace with your playlist
+USERNAME = "cricko.fun"
+PASSWORD = "@Vasu2412"
+YOUTUBE_PLAYLIST_URL = "https://youtube.com/playlist?list=PLzlOHuvgTpSY4_88tPkqV9BKMt-J2Ivnm&si=JoeqJg4oODfAmZCX"  # Replace with your playlist
 UPLOAD_INTERVAL = 60 * 60 * 5  # 5 hours
 
 def convert_cookies():
