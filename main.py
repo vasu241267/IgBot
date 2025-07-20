@@ -1,120 +1,126 @@
-from flask import Flask
 import os
-import time
 import json
-import logging
+import time
+import subprocess
+import threading
+from flask import Flask
 from instagrapi import Client
-from yt_dlp import YoutubeDL
+from instagrapi.exceptions import LoginRequired
+from pytube import Playlist
+from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
 
-# CONFIG
-username = os.getenv("INSTA_USER", "your_username")
-password = os.getenv("INSTA_PASS", "your_password")
-playlist_url = os.getenv("YOUTUBE_PLAYLIST", "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID")
-download_dir = "downloads"
-cookie_json = "cookie.json"
-cookie_txt = "cookies.txt"
-log_file = "upload.log"
-wait_seconds = 5 * 3600
-caption = "Follow @yourpage for more 🔥\n.\n.\n.\n#reels #viral #trending"
+USERNAME = "your_instagram_username"
+PASSWORD = "your_instagram_password"
+YOUTUBE_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PL..."  # Replace with your playlist
+UPLOAD_INTERVAL = 60 * 60 * 5  # 5 hours
 
-os.makedirs(download_dir, exist_ok=True)
-logging.basicConfig(filename=log_file, level=logging.INFO, format='[%(asctime)s] %(message)s')
-
-# Convert JSON cookie to TXT
-def convert_cookie():
+def convert_cookies():
+    if not os.path.exists("cookie.json"):
+        print("❌ cookie.json not found")
+        return
     try:
-        with open(cookie_json) as f:
+        with open("cookie.json", "r") as f:
             cookies = json.load(f)
-        with open(cookie_txt, "w") as f:
-            for c in cookies:
-                f.write(f"{c['domain']}\tTRUE\t{c['path']}\t{str(c['secure']).upper()}\t0\t{c['name']}\t{c['value']}\n")
-        logging.info("✅ cookies.txt generated from cookie.json")
+
+        with open("cookies.txt", "w") as f:
+            for cookie in cookies:
+                if cookie.get("domain", "").startswith("."):
+                    cookie["domain"] = cookie["domain"][1:]
+                line = "\t".join([
+                    cookie.get("domain", ""),
+                    "TRUE" if cookie.get("hostOnly") == False else "FALSE",
+                    cookie.get("path", "/"),
+                    "TRUE" if cookie.get("secure") else "FALSE",
+                    str(int(cookie.get("expirationDate", 0))),
+                    cookie.get("name", ""),
+                    cookie.get("value", "")
+                ])
+                f.write(line + "\n")
+        print("✅ cookies.txt generated from cookie.json")
     except Exception as e:
-        logging.error(f"❌ Failed to convert cookie: {e}")
+        print("❌ Failed to convert cookies:", e)
 
-convert_cookie()
-
-# Setup Instagram client
-cl = Client()
-cl.login(username, password)
-logging.info("✅ Logged into Instagram")
-
-# Store uploaded titles
-uploaded_file = "uploaded.txt"
-if not os.path.exists(uploaded_file):
-    open(uploaded_file, 'w').close()
+def login_instagram():
+    cl = Client()
+    try:
+        cl.load_settings("session.json")
+        cl.login(USERNAME, PASSWORD)
+    except LoginRequired:
+        cl.login(USERNAME, PASSWORD)
+        cl.dump_settings("session.json")
+    return cl
 
 def get_uploaded_titles():
-    with open(uploaded_file) as f:
-        return set(line.strip() for line in f)
+    if not os.path.exists("uploaded_titles.txt"):
+        return set()
+    with open("uploaded_titles.txt", "r") as f:
+        return set(title.strip() for title in f.readlines())
 
 def mark_as_uploaded(title):
-    with open(uploaded_file, "a") as f:
+    with open("uploaded_titles.txt", "a") as f:
         f.write(title + "\n")
 
-def download_video(video_url):
-    ydl_opts = {
-        'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
-        'format': 'mp4[height<=720]',
-        'quiet': True,
-    }
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(video_url)
-        return info
+def download_first_unuploaded_video():
+    convert_cookies()
+    uploaded_titles = get_uploaded_titles()
+    playlist = Playlist(YOUTUBE_PLAYLIST_URL)
 
-def background_job():
-    extract_opts = {'extract_flat': True, 'quiet': True, 'skip_download': True}
-
-    while True:
-        uploaded_titles = get_uploaded_titles()
-
-        with YoutubeDL(extract_opts) as ydl:
-            playlist = ydl.extract_info(playlist_url, download=False)
-            videos = playlist.get('entries', [])
-
-        for entry in videos:
-            title = entry.get('title')
-            video_id = entry.get('id')
-
-            if not title or not video_id or title in uploaded_titles:
-                continue
-
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-
+    for video in playlist.videos:
+        title = video.title
+        if title not in uploaded_titles:
+            print(f"⬇️ Downloading: {title}")
+            output_path = os.path.join("downloads", f"{title}.mp4")
+            os.makedirs("downloads", exist_ok=True)
             try:
-                logging.info(f"📥 Downloading: {title}")
-                info = download_video(video_url)
+                subprocess.run([
+                    "yt-dlp",
+                    video.watch_url,
+                    "-o", output_path,
+                    "--cookies", "cookies.txt"
+                ], check=True)
+                print(f"✅ Downloaded: {title}")
+                return output_path, title
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Failed to download {title}: {e}")
+    return None, None
 
-                video_path = os.path.join(download_dir, f"{info['title']}.{info['ext']}")
+def delete_last_reel(cl):
+    reels = cl.user_clips(cl.user_id)
+    if reels:
+        cl.clip_delete(reels[0].pk)
+        print("🗑️ Deleted previous reel")
 
-                try:
-                    last_reel = cl.user_clips(cl.user_id)[0]
-                    cl.clip_delete(last_reel.pk)
-                    logging.info("🗑️ Previous reel deleted successfully.")
-                except Exception as e:
-                    logging.warning(f"⚠️ Couldn't delete previous reel: {e}")
+def upload_video_to_instagram(cl, video_path, caption):
+    try:
+        clip = VideoFileClip(video_path)
+        duration = clip.duration
+        clip.close()
 
-                logging.info("🚀 Uploading to Instagram...")
-                cl.clip_upload(video_path, caption=caption)
-                logging.info(f"✅ Uploaded: {title}")
+        if duration > 90:
+            print("⚠️ Video is longer than 90 seconds. Skipping.")
+            return
 
-                mark_as_uploaded(title)
-                break
+        delete_last_reel(cl)
+        cl.clip_upload(video_path, caption)
+        print("🚀 Uploaded to Instagram")
+    except Exception as e:
+        print("❌ Upload failed:", e)
 
-            except Exception as e:
-                logging.error(f"❌ Error uploading {title}: {e}")
-
-        logging.info(f"⏳ Sleeping {wait_seconds // 3600}h...")
-        time.sleep(wait_seconds)
-
-import threading
-threading.Thread(target=background_job, daemon=True).start()
+def worker():
+    while True:
+        cl = login_instagram()
+        video_path, title = download_first_unuploaded_video()
+        if video_path and title:
+            upload_video_to_instagram(cl, video_path, title)
+            mark_as_uploaded(title)
+        time.sleep(UPLOAD_INTERVAL)
 
 @app.route("/")
-def home():
-    return "INSTAGRAM REEL AUTO-UPLOADER RUNNING"
+def index():
+    return "✅ YouTube to Instagram Reel bot is running!"
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    threading.Thread(target=worker, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
