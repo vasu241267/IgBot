@@ -1,7 +1,8 @@
-# main.py (Full API version)
+# main.py (API with auto JSON to cookies.txt conversion)
 import os
 import yt_dlp
 import logging
+import json
 from flask import Flask, request
 from instagrapi import Client
 
@@ -13,6 +14,7 @@ output_folder = "downloads"
 os.makedirs(output_folder, exist_ok=True)
 video_path = os.path.join(output_folder, "reel.mp4")
 cookies_file = "cookies.txt"
+cookie_json_file = "cookie.json"  # your saved format
 session_file = "insta_session.json"
 caption = "Follow For Such Amazing Content 😋 #Viral #Like #Follow #Meme... This Reel Is Uploaded Via Automation"
 
@@ -32,6 +34,31 @@ if os.path.exists(session_file):
 else:
     cl.login(username, password)
     cl.dump_settings(session_file)
+
+# ========== Convert JSON cookies to cookies.txt ==========
+def convert_json_to_cookies_txt(json_file, txt_file):
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            cookies = json.load(f)
+
+        with open(txt_file, 'w', encoding='utf-8') as f:
+            for c in cookies:
+                f.write(f"{c['domain']}	"
+                        f"{str(not c.get('hostOnly', False)).upper()}	"
+                        f"{c['path']}	"
+                        f"{'TRUE' if c['secure'] else 'FALSE'}	"
+                        f"{int(c['expirationDate']) if 'expirationDate' in c else 0}	"
+                        f"{c['name']}	"
+                        f"{c['value']}\n")
+        logging.info("✅ cookies.txt generated from cookie.json")
+    except Exception as e:
+        logging.error(f"❌ Failed to convert cookie: {e}")
+
+# Always run conversion at startup
+if os.path.exists(cookie_json_file):
+    convert_json_to_cookies_txt(cookie_json_file, cookies_file)
+else:
+    logging.warning("⚠️ cookie.json not found — using last cookies.txt")
 
 # ========== Helpers ==========
 def download_video(url):
@@ -67,9 +94,10 @@ def home():
 @app.route("/set-cookies", methods=["POST"])
 def set_cookies():
     content = request.data.decode("utf-8")
-    with open(cookies_file, "w", encoding="utf-8") as f:
+    with open(cookie_json_file, "w", encoding="utf-8") as f:
         f.write(content)
-    return {"status": "✅ Cookies saved"}
+    convert_json_to_cookies_txt(cookie_json_file, cookies_file)
+    return {"status": "✅ cookie.json saved and converted"}
 
 @app.route("/upload", methods=["POST"])
 def upload():
