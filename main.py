@@ -1,4 +1,4 @@
-# main.py (API with auto JSON to cookies.txt conversion)
+# main.py (Complete YouTube to Instagram Reels uploader with auto cookie conversion)
 import os
 import yt_dlp
 import logging
@@ -14,7 +14,7 @@ output_folder = "downloads"
 os.makedirs(output_folder, exist_ok=True)
 video_path = os.path.join(output_folder, "reel.mp4")
 cookies_file = "cookies.txt"
-cookie_json_file = "cookie.json"  # your saved format
+cookie_json_file = "cookie.json"
 session_file = "insta_session.json"
 caption = "Follow For Such Amazing Content 😋 #Viral #Like #Follow #Meme... This Reel Is Uploaded Via Automation"
 
@@ -69,7 +69,7 @@ def download_video(url):
 
     ydl_opts = {
         'outtmpl': video_path,
-        'quiet': True,
+        'quiet': False,
         'format': 'mp4/best',
         'noplaylist': True,
         'geo_bypass': True,
@@ -84,7 +84,9 @@ def download_video(url):
         ydl_opts['cookiefile'] = cookies_file
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(url, download=True)
+        info = ydl.extract_info(url, download=True)
+        logging.info(f"✅ Downloaded: {info.get('title')}")
+        return info
 
 # ========== Routes ==========
 @app.route("/")
@@ -109,10 +111,12 @@ def upload():
 
     try:
         info = download_video(url)
+        logging.info(f"📤 Uploading {video_path} to Instagram")
         cl.clip_upload(video_path, caption=caption)
+        logging.info(f"✅ Uploaded to Instagram: {info.get('title')}")
         return {"status": "✅ Uploaded", "title": info.get("title")}
     except Exception as e:
-        logging.error(f"❌ Error: {e}")
+        logging.error(f"❌ Error uploading: {e}")
         return {"error": str(e)}, 500
 
 @app.route("/health")
