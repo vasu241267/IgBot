@@ -132,9 +132,11 @@ def worker():
         print("⏳ Waiting until next cycle...\n")
         time.sleep(UPLOAD_INTERVAL)
 
+from flask import Response
+
 @app.route("/")
 def index():
-    return "✅ YouTube to Instagram Reel bot is running!"
+    return Response("✅ YouTube to Instagram Reel bot is running!", status=200, mimetype="text/plain")
 
 if __name__ == "__main__":
     print("⏳ Waiting 10 sec for Koyeb health check to pass...")
