@@ -136,11 +136,8 @@ def worker():
 def index():
     return "✅ YouTube to Instagram Reel bot is running!"
 
-def delayed_worker_start():
-    print("⏳ Waiting 10 sec for Koyeb health check to pass...")
-    time.sleep(10)
-    worker()
-
 if __name__ == "__main__":
-    threading.Thread(target=delayed_worker_start, daemon=True).start()
+    print("⏳ Waiting 10 sec for Koyeb health check to pass...")
+    time.sleep(25)  # 👈 Add this line
+    threading.Thread(target=worker, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
