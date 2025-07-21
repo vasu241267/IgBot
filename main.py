@@ -141,6 +141,11 @@ def index():
 
 if __name__ == "__main__":
     print("⏳ Waiting 10 sec for Koyeb health check to pass...")
-    time.sleep(300)  # 👈 Add this line
+    
+    # ✅ Start Flask server immediately (so Koyeb can check /)
     threading.Thread(target=worker, daemon=True).start()
+
+    # ✅ Start Flask (non-blocking)
     app.run(host="0.0.0.0", port=8080)
+
+    # 💤 Optional: delay inside the worker function itself instead
