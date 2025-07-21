@@ -144,12 +144,7 @@ def index():
     return Response("✅ YouTube to Instagram Reel bot is running!", status=200, mimetype="text/plain")
 
 if __name__ == "__main__":
-    print("⏳ Waiting 10 sec for Koyeb health check to pass...")
-    
-    # ✅ Start Flask server immediately (so Koyeb can check /)
+    print("⏳ Waiting 7 sec for Koyeb health check to pass...")
+    time.sleep(7)  # 👈 actual delay before anything else
     threading.Thread(target=worker, daemon=True).start()
-
-    # ✅ Start Flask (non-blocking)
     app.run(host="0.0.0.0", port=8080)
-
-    # 💤 Optional: delay inside the worker function itself instead
