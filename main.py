@@ -89,17 +89,17 @@ def download_first_unuploaded_video():
         print(f"❌ Failed to fetch playlist videos: {e.stderr}")
     return None, None
 
-def delete_last_reel(cl):
-    print("🧹 Deleting previous reel (if any)...")
+import shutil
+
+def clean_download_folder():
+    print("🧹 Full cleanup: deleting everything in downloads folder...")
+    folder = "downloads"
     try:
-        reels = cl.user_clips(cl.user_id)
-        if reels:
-            cl.clip_delete(reels[0].pk)
-            print("🗑️ Deleted previous reel")
-        else:
-            print("ℹ️ No previous reels found")
+        shutil.rmtree(folder)
+        os.makedirs(folder, exist_ok=True)
+        print("✅ Downloads folder cleaned.")
     except Exception as e:
-        print("❌ Failed to delete previous reel:", e)
+        print(f"❌ Failed to clean downloads folder: {e}")
 
 def upload_video_to_instagram(cl, video_path, caption):
     try:
@@ -111,7 +111,7 @@ def upload_video_to_instagram(cl, video_path, caption):
             print("⚠️ Video is longer than 90 seconds. Skipping.")
             return
 
-        delete_last_reel(cl)
+        clean_download_folder()
         print("📤 Uploading to Instagram...")
         cl.clip_upload(video_path, caption)
         print("🚀 Uploaded successfully")
