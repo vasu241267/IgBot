@@ -11,6 +11,7 @@ from instagrapi import Client
 from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
+FIXED_CAPTION_SUFFIX = "\n\n#shorts #reels #cricko #foryou #bikelover"
 
 USERNAME = "cricko.fun"
 PASSWORD = "@Vasu2412"
@@ -129,7 +130,7 @@ def upload_video_to_instagram(cl, video_path, caption):
             return
 
         print("📤 Uploading to Instagram with fixed thumbnail...")
-        cl.clip_upload(video_path, caption, thumbnail=thumbnail_path)
+        cl.clip_upload(video_path, caption + FIXED_CAPTION_SUFFIX, thumbnail=thumbnail_path)
         print("🚀 Uploaded successfully")
 
         if os.path.exists(video_path):
