@@ -110,11 +110,11 @@ def upload_video_to_instagram(cl, video_path, caption):
         del clip
         gc.collect()
 
-        if duration > 120:
-            print("⚠️ Video is longer than 120 seconds. Skipping.")
+        if duration > 90:
+            print("⚠️ Video is longer than 90 seconds. Skipping.")
             return
 
-        # 🔐 Ensure logged in before upload
+        # Ensure login is valid
         try:
             cl.get_timeline_feed()
         except:
@@ -122,8 +122,14 @@ def upload_video_to_instagram(cl, video_path, caption):
             cl.login(USERNAME, PASSWORD)
             cl.dump_settings("session.json")
 
-        print("📤 Uploading to Instagram...")
-        cl.clip_upload(video_path, caption)
+        # 🔳 Use fixed thumbnail
+        thumbnail_path = "fix-thumbnail.jpg"
+        if not os.path.exists(thumbnail_path):
+            print(f"❌ Thumbnail file '{thumbnail_path}' not found.")
+            return
+
+        print("📤 Uploading to Instagram with fixed thumbnail...")
+        cl.clip_upload(video_path, caption, thumbnail=thumbnail_path)
         print("🚀 Uploaded successfully")
 
         if os.path.exists(video_path):
@@ -132,6 +138,7 @@ def upload_video_to_instagram(cl, video_path, caption):
 
     except Exception as e:
         print("❌ Upload failed:", e)
+
 
 
 def worker():
