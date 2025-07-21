@@ -11,7 +11,7 @@ from instagrapi import Client
 from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
-FIXED_CAPTION_SUFFIX = "\n\n#shorts #reels #cricko #foryou #bikelover"
+FIXED_CAPTION_SUFFIX = "\n\n✨🤏 This Reel Uploaded By Automation If You Wanna Do Something Like This Then Dm Me 💫#shorts #reels #cricko #foryou #bikelover"
 
 USERNAME = "cricko.fun"
 PASSWORD = "@Vasu2412"
