@@ -136,6 +136,7 @@ from flask import Response
 
 @app.route("/")
 def index():
+    print("✅ Health check received")
     return Response("✅ YouTube to Instagram Reel bot is running!", status=200, mimetype="text/plain")
 
 if __name__ == "__main__":
