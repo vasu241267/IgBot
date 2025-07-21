@@ -130,12 +130,8 @@ def upload_video_to_instagram(cl, video_path, caption):
             return
 
         print("📤 Uploading to Instagram with fixed thumbnail...")
-        cl.clip_upload(
-        video_path,
-        caption + FIXED_CAPTION_SUFFIX,
-        thumbnail=thumbnail_path,
-        original_audio=True  # ✅ Force original audio to avoid broken audio metadata
-         )
+        cl.clip_upload(video_path, caption + FIXED_CAPTION_SUFFIX, thumbnail=thumbnail_path)
+
 
         print("🚀 Uploaded successfully")
 
