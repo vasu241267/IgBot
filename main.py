@@ -138,6 +138,6 @@ def index():
 
 if __name__ == "__main__":
     print("⏳ Waiting 10 sec for Koyeb health check to pass...")
-    time.sleep(25)  # 👈 Add this line
+    time.sleep(300)  # 👈 Add this line
     threading.Thread(target=worker, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
