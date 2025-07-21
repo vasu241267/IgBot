@@ -107,25 +107,32 @@ def upload_video_to_instagram(cl, video_path, caption):
         clip = VideoFileClip(video_path)
         duration = clip.duration
         clip.close()
-        del clip  # free MoviePy memory
+        del clip
         gc.collect()
 
-        if duration > 90:
-            print("⚠️ Video is longer than 90 seconds. Skipping.")
+        if duration > 120:
+            print("⚠️ Video is longer than 120 seconds. Skipping.")
             return
+
+        # 🔐 Ensure logged in before upload
+        try:
+            cl.get_timeline_feed()
+        except:
+            print("⚠️ Session expired. Logging in again...")
+            cl.login(USERNAME, PASSWORD)
+            cl.dump_settings("session.json")
 
         print("📤 Uploading to Instagram...")
         cl.clip_upload(video_path, caption)
         print("🚀 Uploaded successfully")
 
-        # Delete video file explicitly
         if os.path.exists(video_path):
             os.remove(video_path)
-
         clean_download_folder()
 
     except Exception as e:
         print("❌ Upload failed:", e)
+
 
 def worker():
     print("🕒 Delaying worker for 3 minutes to let Flask health pass...")
