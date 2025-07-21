@@ -111,10 +111,11 @@ def upload_video_to_instagram(cl, video_path, caption):
             print("⚠️ Video is longer than 90 seconds. Skipping.")
             return
 
-        clean_download_folder()
+        
         print("📤 Uploading to Instagram...")
         cl.clip_upload(video_path, caption)
         print("🚀 Uploaded successfully")
+        clean_download_folder()
     except Exception as e:
         print("❌ Upload failed:", e)
 
