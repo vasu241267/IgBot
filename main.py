@@ -120,6 +120,9 @@ def upload_video_to_instagram(cl, video_path, caption):
         print("❌ Upload failed:", e)
 
 def worker():
+    print("🕒 Delaying worker for 3 minutes to let Flask health pass...")
+    time.sleep(180)
+
     while True:
         print("\n🧠 Starting new upload cycle...")
         cl = login_instagram()
@@ -131,6 +134,7 @@ def worker():
             print("⚠️ No new video to upload.")
         print("⏳ Waiting until next cycle...\n")
         time.sleep(UPLOAD_INTERVAL)
+
 
 from flask import Response
 
