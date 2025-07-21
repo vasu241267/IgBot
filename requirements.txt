@@ -4,3 +4,4 @@ instagrapi
 browser-cookie3
 requests
 pytube
+psutil
