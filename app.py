@@ -13,10 +13,10 @@ from moviepy.editor import VideoFileClip
 app = Flask(__name__)
 FIXED_CAPTION_SUFFIX = "\n\n✨🤏 This Reel Uploaded By Automation If You Wanna Do Something Like This Then Dm Me 💫#shorts #reels #cricko #foryou #bikelover"
 
-USERNAME = "cricko.fun"
+USERNAME = "attitudexmeme"
 PASSWORD = "@Vasu2412"
 YOUTUBE_PLAYLIST_URL = "https://youtube.com/playlist?list=PLzlOHuvgTpSY4_88tPkqV9BKMt-J2Ivnm&si=JoeqJg4oODfAmZCX"
-UPLOAD_INTERVAL = 60 * 3  # Every 5 minutes
+UPLOAD_INTERVAL = 60 * 60 * 5  # Every 5 minutes
 
 def login_instagram():
     print("🔐 Logging into Instagram...")
