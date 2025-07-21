@@ -15,7 +15,7 @@ app = Flask(__name__)
 USERNAME = "cricko.fun"
 PASSWORD = "@Vasu2412"
 YOUTUBE_PLAYLIST_URL = "https://youtube.com/playlist?list=PLzlOHuvgTpSY4_88tPkqV9BKMt-J2Ivnm&si=JoeqJg4oODfAmZCX"
-UPLOAD_INTERVAL = 60 * 5  # Every 5 minutes
+UPLOAD_INTERVAL = 60 * 3  # Every 5 minutes
 
 def login_instagram():
     print("🔐 Logging into Instagram...")
